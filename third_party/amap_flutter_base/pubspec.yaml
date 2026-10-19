@@ -1,0 +1,12 @@
+name: amap_flutter_base
+description: Official AMap Flutter base library, locally patched for Dart 3.
+version: 3.0.0+campura.1
+homepage: https://lbs.amap.com/
+
+environment:
+  sdk: '>=2.12.0 <4.0.0'
+  flutter: '>=3.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter

@@ -343,8 +343,9 @@ class _CourseDateRailState extends State<CourseDateRail> {
     super.didUpdateWidget(old);
     if ((touch == null &&
             DateUtils.isSameDay(widget.selected, DateTime.now())) ||
-        widget.selected.difference(center).inDays.abs() > 3)
+        widget.selected.difference(center).inDays.abs() > 3) {
       center = dayOnly(widget.selected);
+    }
   }
 
   void _week(int offset) {
@@ -389,6 +390,8 @@ class _CourseDateRailState extends State<CourseDateRail> {
             builder: (context, size) => Semantics(
               label: '课表日期时间轴',
               value: dateLabel(widget.selected),
+              increasedValue: dateLabel(dayOffset(widget.selected, 1)),
+              decreasedValue: dateLabel(dayOffset(widget.selected, -1)),
               onIncrease: () =>
                   widget.onSelected(dayOffset(widget.selected, 1)),
               onDecrease: () =>
@@ -495,7 +498,7 @@ class CourseWeekGrid extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     const rowHeight = 102.0;
     return SizedBox(
-      height: 64 + math.max(1, starts.length) * rowHeight,
+      height: 66 + math.max(1, starts.length) * rowHeight,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

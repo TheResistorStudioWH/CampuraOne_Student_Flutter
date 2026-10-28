@@ -10,6 +10,7 @@
 # Android 本地环境
 **/.gradle/
 **/local.properties
+android/wear.local.properties
 
 # IDE
 .idea/

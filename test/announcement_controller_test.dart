@@ -74,10 +74,11 @@ void main() {
       baseUri: Uri.parse('https://example.test'),
       client: MockClient((request) async {
         expect(request.headers['Cache-Control'], contains('no-store'));
-        if (request.url.path.endsWith('announcements.php'))
+        if (request.url.path.endsWith('announcements.php')) {
           return response([
             {'announceID': 1, 'type': 0, 'content': '通知'},
           ]);
+        }
         summaries++;
         return http.Response('unavailable', 503);
       }),
@@ -176,7 +177,7 @@ void main() {
       final feed = AnnouncementFeed(
         baseUri: Uri.parse('https://example.test'),
         client: MockClient((request) async {
-          if (request.url.path.endsWith('announcements.php'))
+          if (request.url.path.endsWith('announcements.php')) {
             return response([
               {
                 'announceID': 1,
@@ -185,6 +186,7 @@ void main() {
                 'endTime': '2026-10-28T00:00:01Z',
               },
             ]);
+          }
           return pending.future;
         }),
       );

@@ -21,6 +21,10 @@ class _AdvertisementDeckState extends State<AdvertisementDeck> {
   Widget build(BuildContext context) => Semantics(
     label: '广告图片叠放',
     value: '第 ${selected + 1} 张，共 ${DemoData.largeAdAssets.length} 张',
+    increasedValue:
+        '第 ${(selected + 1) % DemoData.largeAdAssets.length + 1} 张，共 ${DemoData.largeAdAssets.length} 张',
+    decreasedValue:
+        '第 ${(selected - 1 + DemoData.largeAdAssets.length) % DemoData.largeAdAssets.length + 1} 张，共 ${DemoData.largeAdAssets.length} 张',
     onIncrease: () => advance(1),
     onDecrease: () => advance(-1),
     child: LayoutBuilder(

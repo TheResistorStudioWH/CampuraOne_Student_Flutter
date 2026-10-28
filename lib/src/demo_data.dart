@@ -11,6 +11,11 @@ class DemoData {
 
   static final announcements = <CampusAnnouncement>[
     CampusAnnouncement(1, '## 演示重要通知\n\n本周校园活动安排已更新，请留意校历中的活动时间。', 2),
+    CampusAnnouncement(
+      4,
+      '## 图书馆开放安排 · 演示\n\n- 自习区请保持安静\n- 借阅时间请以学校正式通知为准\n\n**这是本地示例，不是正式公告。**',
+      2,
+    ),
     CampusAnnouncement(2, '欢迎使用域校屿 Android 演示版。这里显示学校通知。', 0),
     CampusAnnouncement(3, '如遇紧急通知，将在这里优先展示。', 1),
   ];
@@ -66,10 +71,28 @@ class DemoData {
     CampusProduct(104, 3, '午餐套餐', 22, '主食与配菜组合', Icons.ramen_dining_rounded),
   ];
 
-  static const promotions = <CampusPromotion>[
-    CampusPromotion(201, 101, '咖啡第二杯半价', '今日精选'),
-    CampusPromotion(202, 104, '午餐套餐优惠', '食堂活动'),
-    CampusPromotion(203, 103, '开学文具组合价', '校园书屋'),
+  static final promotions = <CampusPromotion>[
+    CampusPromotion(
+      201,
+      101,
+      '咖啡第二杯半价',
+      '今日精选',
+      endTime: DateTime.now().add(const Duration(hours: 8)),
+    ),
+    CampusPromotion(
+      202,
+      104,
+      '午餐套餐优惠',
+      '食堂活动',
+      endTime: DateTime.now().add(const Duration(days: 3)),
+    ),
+    CampusPromotion(
+      203,
+      103,
+      '开学文具组合价',
+      '校园书屋',
+      endTime: DateTime.now().add(const Duration(days: 14)),
+    ),
   ];
 
   static const largeAdAssets = [
@@ -81,13 +104,32 @@ class DemoData {
 
   static List<CampusCourse> coursesOn(DateTime date) =>
       courses.where((course) => course.weekday == date.weekday).toList()
-        ..sort((a, b) => a.startHour.compareTo(b.startHour));
+        ..sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
 }
 
 class CampusAnnouncement {
-  const CampusAnnouncement(this.id, this.content, this.type);
+  const CampusAnnouncement(
+    this.id,
+    this.content,
+    this.type, {
+    this.startTime,
+    this.endTime,
+    this.createdAt,
+    this.updatedAt,
+  });
   final int id;
   final String content;
+  final DateTime? startTime;
+  final DateTime? endTime;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  bool isActive(DateTime now) =>
+      (startTime == null || !now.isBefore(startTime!)) &&
+      (endTime == null || !now.isAfter(endTime!));
+
+  String get fingerprint =>
+      '$id|$type|$content|$startTime|$endTime|$createdAt|$updatedAt';
 
   /// 0 daily, 1 emergency, 2 important Markdown, matching the Server.
   final int type;
@@ -117,6 +159,8 @@ class CampusCourse {
   final int endMinute;
   final String location;
   final String teacher;
+  int get startMinutes => startHour * 60 + startMinute;
+  int get endMinutes => endHour * 60 + endMinute;
   DateTime startOn(DateTime date) =>
       DateTime(date.year, date.month, date.day, startHour, startMinute);
   DateTime endOn(DateTime date) =>
@@ -166,7 +210,24 @@ class CampusProduct {
 }
 
 class CampusPromotion {
-  const CampusPromotion(this.id, this.productId, this.rule, this.subtitle);
+  const CampusPromotion(
+    this.id,
+    this.productId,
+    this.rule,
+    this.subtitle, {
+    this.endTime,
+  });
+  final DateTime? endTime;
+  bool get isActive => endTime == null || !DateTime.now().isAfter(endTime!);
+  String get remainingLabel {
+    if (endTime == null) return '长期有效 · 演示';
+    final remaining = endTime!.difference(DateTime.now());
+    if (remaining.isNegative) return '已结束';
+    return remaining.inHours < 24
+        ? '即将结束 · 演示'
+        : '剩余 ${(remaining.inHours / 24).ceil()} 天 · 演示';
+  }
+
   final int id;
   final int productId;
   final String rule;

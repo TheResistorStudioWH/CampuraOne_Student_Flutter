@@ -1,280 +1,42 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 
 import 'demo_data.dart';
-
-class DetailScaffold extends StatelessWidget {
-  const DetailScaffold({
-    super.key,
-    required this.title,
-    required this.child,
-    this.actions,
-  });
-  final String title;
-  final Widget child;
-  final List<Widget>? actions;
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(title), actions: actions),
-    body: SafeArea(child: child),
-  );
-}
-
-class CoursePage extends StatefulWidget {
-  const CoursePage({super.key});
-  @override
-  State<CoursePage> createState() => _CoursePageState();
-}
-
-class _CoursePageState extends State<CoursePage> {
-  static const _calendarChannel = MethodChannel('campura.one/calendar');
-  DateTime selected = DateUtils.dateOnly(DateTime.now());
-  DateTime railCenter = DateUtils.dateOnly(DateTime.now());
-  final railController = ScrollController(initialScrollOffset: 320);
-
-  @override
-  void dispose() {
-    railController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: selected,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2035),
-    );
-    if (date != null) {
-      setState(() {
-        selected = date;
-        railCenter = date;
-      });
-      if (railController.hasClients) railController.jumpTo(320);
-    }
-  }
-
-  Future<void> _addCalendar(CampusCourse course) async {
-    try {
-      await _calendarChannel.invokeMethod<void>('insertEvent', {
-        'title': course.title,
-        'location': course.location,
-        'description': course.teacher,
-        'startMillis': course.startOn(selected).millisecondsSinceEpoch,
-        'endMillis': course.endOn(selected).millisecondsSinceEpoch,
-      });
-    } on PlatformException {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('没有找到可添加日程的日历应用')));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final courses = DemoData.coursesOn(selected);
-    final colors = Theme.of(context).colorScheme;
-    final railDays = List.generate(
-      15,
-      (i) => railCenter.add(Duration(days: i - 7)),
-    );
-    return DetailScaffold(
-      title: '课程表',
-      actions: [
-        IconButton(
-          tooltip: '选择日期',
-          onPressed: _pickDate,
-          icon: const Icon(Icons.date_range_rounded),
-        ),
-      ],
-      child: Row(
-        children: [
-          SizedBox(
-            width: 68,
-            child: ListView.builder(
-              controller: railController,
-              padding: const EdgeInsets.only(top: 96, bottom: 24),
-              itemCount: railDays.length,
-              itemBuilder: (context, index) {
-                final date = railDays[index];
-                final isSelected = DateUtils.isSameDay(date, selected);
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
-                  child: Material(
-                    color: isSelected
-                        ? colors.primaryContainer
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(18),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(18),
-                      onTap: () => setState(() => selected = date),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 9),
-                        child: Column(
-                          children: [
-                            Text(
-                              '周${_weekday(date.weekday)}',
-                              style: Theme.of(context).textTheme.labelSmall,
-                            ),
-                            Text(
-                              '${date.day}',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(8, 16, 16, 28),
-              children: [
-                Text(
-                  '${selected.year}年${selected.month}月${selected.day}日 · 周${_weekday(selected.weekday)}',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  '当天共 ${courses.length} 节课 · 演示课表',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 20),
-                if (courses.isEmpty)
-                  const _EmptyState(
-                    icon: Icons.event_available_rounded,
-                    title: '当天暂无课程',
-                    subtitle: '可在左侧切换日期，或用右上角选择日期。',
-                  ),
-                for (final course in courses)
-                  Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            course.timeLabel,
-                            style: Theme.of(context).textTheme.labelLarge
-                                ?.copyWith(color: colors.primary),
-                          ),
-                          const SizedBox(height: 7),
-                          Text(
-                            course.title,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 8),
-                          Text('${course.location} · ${course.teacher}'),
-                          const SizedBox(height: 12),
-                          OutlinedButton.icon(
-                            icon: const Icon(Icons.event_rounded),
-                            label: const Text('添加到系统日历'),
-                            onPressed: () => _addCalendar(course),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-String _weekday(int day) => '一二三四五六日'[day - 1];
-
-class CalendarPage extends StatefulWidget {
-  const CalendarPage({super.key});
-  @override
-  State<CalendarPage> createState() => _CalendarPageState();
-}
-
-class _CalendarPageState extends State<CalendarPage> {
-  DateTime selected = DateUtils.dateOnly(DateTime.now());
-
-  @override
-  Widget build(BuildContext context) {
-    final dayEvents = DemoData.calendarEvents
-        .where((e) => e.includes(selected))
-        .toList();
-    return DetailScaffold(
-      title: '校历',
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
-        children: [
-          Card(
-            child: CalendarDatePicker(
-              key: ValueKey('${selected.year}-${selected.month}'),
-              initialDate: selected,
-              firstDate: DateTime(2020),
-              lastDate: DateTime(2035),
-              currentDate: DateTime.now(),
-              onDateChanged: (value) => setState(() => selected = value),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '${selected.month}月${selected.day}日',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          if (dayEvents.isEmpty)
-            const _EmptyState(
-              icon: Icons.calendar_today_rounded,
-              title: '当天无校历事项',
-              subtitle: '选择其他日期查看活动和教学安排。',
-            ),
-          for (final event in dayEvents)
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.event_note_rounded),
-                title: Text(event.title),
-                subtitle: Text(event.category),
-              ),
-            ),
-          const SizedBox(height: 14),
-          Text('近期事项', style: Theme.of(context).textTheme.titleMedium),
-          for (final event in DemoData.calendarEvents)
-            ListTile(
-              leading: const Icon(Icons.circle, size: 11),
-              title: Text(event.title),
-              subtitle: Text(
-                '${event.start.month}月${event.start.day}日 · ${event.category}',
-              ),
-              onTap: () => setState(() {
-                selected = event.start;
-              }),
-            ),
-        ],
-      ),
-    );
-  }
-}
+import 'schedule/course_page.dart';
+import 'calendar/calendar_widgets.dart';
+import 'widgets/detail_scaffold.dart';
+export 'schedule/course_page.dart';
+export 'calendar/calendar_widgets.dart' show CalendarPage;
+export 'widgets/detail_scaffold.dart';
+export 'widgets/announcements.dart'
+    show AnnouncementsPage, MarkdownAnnouncementsPage;
+export 'widgets/advertisement_deck.dart' show AdvertisementPage;
 
 class PromotionsPage extends StatefulWidget {
-  const PromotionsPage({super.key});
+  const PromotionsPage({super.key, this.initialHot = false});
+  final bool initialHot;
   @override
   State<PromotionsPage> createState() => _PromotionsPageState();
 }
 
 class _PromotionsPageState extends State<PromotionsPage> {
-  bool hot = false;
+  late bool hot = widget.initialHot;
   late List<CampusPromotion> random = [...DemoData.promotions]..shuffle();
 
   @override
   Widget build(BuildContext context) {
-    final events = hot ? DemoData.promotions : random;
+    final events = (hot ? [...DemoData.promotions] : random)
+        .where((s) => s.isActive)
+        .toList();
+    if (hot) {
+      events.sort(
+        (a, b) => (a.endTime ?? DateTime(9999)).compareTo(
+          b.endTime ?? DateTime(9999),
+        ),
+      );
+    }
     return DetailScaffold(
       title: '最近促销',
+      feature: 'salesTimeline',
       actions: [
         IconButton(
           tooltip: '刷新推荐',
@@ -295,7 +57,7 @@ class _PromotionsPageState extends State<PromotionsPage> {
               ),
               ButtonSegment(
                 value: true,
-                label: Text('热门'),
+                label: Text('热榜'),
                 icon: Icon(Icons.local_fire_department_rounded),
               ),
             ],
@@ -306,7 +68,7 @@ class _PromotionsPageState extends State<PromotionsPage> {
           if (hot)
             const Padding(
               padding: EdgeInsets.only(bottom: 12),
-              child: Text('演示排序 · 热度数据尚未接入'),
+              child: Text('演示榜单按结束时间排列 · 暂无真实热度数据'),
             ),
           for (final sale in events) _promotionCard(context, sale),
         ],
@@ -322,7 +84,7 @@ class _PromotionsPageState extends State<PromotionsPage> {
         contentPadding: const EdgeInsets.all(12),
         leading: CircleAvatar(child: Icon(product.icon)),
         title: Text(sale.rule),
-        subtitle: Text('${product.name} · ${sale.subtitle}'),
+        subtitle: Text('${product.name} · ${sale.remainingLabel}'),
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute<void>(
@@ -332,32 +94,6 @@ class _PromotionsPageState extends State<PromotionsPage> {
       ),
     );
   }
-}
-
-class AdvertisementPage extends StatelessWidget {
-  const AdvertisementPage({super.key});
-  @override
-  Widget build(BuildContext context) => DetailScaffold(
-    title: '推荐广告',
-    child: ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Text('本地演示广告素材'),
-        const SizedBox(height: 12),
-        for (final path in DemoData.largeAdAssets)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: AspectRatio(
-                aspectRatio: 3,
-                child: Image.asset(path, fit: BoxFit.cover),
-              ),
-            ),
-          ),
-      ],
-    ),
-  );
 }
 
 class ToolboxPage extends StatelessWidget {
@@ -401,133 +137,6 @@ class ToolboxPage extends StatelessWidget {
       ],
     ),
   );
-}
-
-class AnnouncementsPage extends StatefulWidget {
-  const AnnouncementsPage({super.key, this.announcements});
-  final List<CampusAnnouncement>? announcements;
-  @override
-  State<AnnouncementsPage> createState() => _AnnouncementsPageState();
-}
-
-class _AnnouncementsPageState extends State<AnnouncementsPage> {
-  int? filter;
-
-  @override
-  Widget build(BuildContext context) {
-    final items =
-        (widget.announcements ?? DemoData.announcements)
-            .where((a) => a.type != 2 && (filter == null || a.type == filter))
-            .toList()
-          ..sort((a, b) => b.type.compareTo(a.type));
-    return DetailScaffold(
-      title: '短通知',
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Wrap(
-            spacing: 8,
-            children: [
-              ChoiceChip(
-                label: const Text('全部'),
-                selected: filter == null,
-                onSelected: (_) => setState(() => filter = null),
-              ),
-              for (final type in [1, 0])
-                ChoiceChip(
-                  label: Text(switch (type) {
-                    1 => '紧急',
-                    _ => '日常',
-                  }),
-                  selected: filter == type,
-                  onSelected: (_) => setState(() => filter = type),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          for (final item in items)
-            Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: ListTile(
-                contentPadding: const EdgeInsets.all(14),
-                leading: Icon(
-                  item.type == 1
-                      ? Icons.warning_amber_rounded
-                      : Icons.notifications_outlined,
-                ),
-                title: Text(item.category),
-                subtitle: Text(
-                  item.content,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => DetailScaffold(
-                      title: '${item.category}通知',
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: SelectableText(
-                          item.content,
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class MarkdownAnnouncementsPage extends StatelessWidget {
-  const MarkdownAnnouncementsPage({super.key, required this.announcements});
-  final List<CampusAnnouncement> announcements;
-
-  @override
-  Widget build(BuildContext context) {
-    final important = announcements.where((item) => item.type == 2).toList();
-    return DetailScaffold(
-      title: '重要通知',
-      child: important.isEmpty
-          ? const Center(child: Text('暂无重要通知'))
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                for (final item in important)
-                  Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      leading: const Icon(Icons.priority_high_rounded),
-                      title: Text('重要通知 ${item.id}'),
-                      subtitle: Text(
-                        item.content.replaceAll(RegExp(r'[#*`]'), '').trim(),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => DetailScaffold(
-                            title: '重要通知',
-                            child: Markdown(
-                              data: item.content,
-                              padding: const EdgeInsets.all(20),
-                              selectable: true,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-    );
-  }
 }
 
 class ShopsPage extends StatelessWidget {
@@ -662,28 +271,4 @@ class ProductPage extends StatelessWidget {
       ),
     );
   }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 12),
-    child: Column(
-      children: [
-        Icon(icon, size: 48, color: Theme.of(context).colorScheme.primary),
-        const SizedBox(height: 12),
-        Text(title, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 5),
-        Text(subtitle, textAlign: TextAlign.center),
-      ],
-    ),
-  );
 }

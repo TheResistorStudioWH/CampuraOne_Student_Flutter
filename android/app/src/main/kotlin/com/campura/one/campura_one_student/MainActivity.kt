@@ -3,6 +3,8 @@ package com.campura.one.campura_one_student
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.provider.CalendarContract
+import androidx.core.content.FileProvider
+import java.io.File
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -14,6 +16,30 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             "campura.one/calendar",
         ).setMethodCallHandler { call, result ->
+            if (call.method == "shareCalendar") {
+                val contents = call.argument<String>("ics")
+                if (contents == null || !contents.startsWith("BEGIN:VCALENDAR") || contents.length > 1_000_000) {
+                    result.error("INVALID_CALENDAR", "Invalid calendar file", null)
+                    return@setMethodCallHandler
+                }
+                try {
+                    val directory = File(cacheDir, "calendars").apply { mkdirs() }
+                    val name = (call.argument<String>("name") ?: "campura").replace(Regex("[^\\p{L}\\p{N}_-]"), "_")
+                    val file = File(directory, "$name.ics").apply { writeText(contents, Charsets.UTF_8) }
+                    val uri = FileProvider.getUriForFile(this, "$packageName.calendar-files", file)
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/calendar"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        clipData = android.content.ClipData.newRawUri("calendar", uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    startActivity(Intent.createChooser(intent, "导出课表"))
+                    result.success(null)
+                } catch (_: Exception) {
+                    result.error("CALENDAR_EXPORT_FAILED", "Cannot share calendar", null)
+                }
+                return@setMethodCallHandler
+            }
             if (call.method != "insertEvent") {
                 result.notImplemented()
                 return@setMethodCallHandler

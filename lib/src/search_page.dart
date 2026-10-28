@@ -15,6 +15,7 @@ class SearchPage extends StatefulWidget {
 class _SearchPageState extends State<SearchPage> {
   static const _historyKey = 'campura.search.history';
   final controller = TextEditingController();
+  final modeMenu = MenuController();
   SearchMode mode = SearchMode.smart;
   List<String> history = [];
   String query = '';
@@ -31,7 +32,12 @@ class _SearchPageState extends State<SearchPage> {
     final raw = prefs.getString(_historyKey);
     if (!mounted || raw == null) return;
     try {
-      setState(() => history = List<String>.from(jsonDecode(raw) as List));
+      final value = jsonDecode(raw);
+      setState(
+        () => history = value is List
+            ? value.whereType<String>().take(8).toList()
+            : [],
+      );
     } on FormatException {
       setState(() => history = []);
     }
@@ -40,10 +46,12 @@ class _SearchPageState extends State<SearchPage> {
   Future<void> _submit(String value) async {
     final cleaned = value.trim();
     if (cleaned.isEmpty) return;
+    modeMenu.close();
+    FocusScope.of(context).unfocus();
     final updated = [
       cleaned,
-      ...history.where((item) => item != cleaned),
-    ].take(12).toList();
+      ...history.where((item) => item.toLowerCase() != cleaned.toLowerCase()),
+    ].take(8).toList();
     setState(() {
       query = cleaned;
       submitted = true;
@@ -73,6 +81,7 @@ class _SearchPageState extends State<SearchPage> {
               child: SearchBar(
                 controller: controller,
                 autoFocus: true,
+                onTap: modeMenu.close,
                 hintText: '搜索促销、商品和商户',
                 leading: const Icon(Icons.search_rounded),
                 trailing: [
@@ -96,23 +105,39 @@ class _SearchPageState extends State<SearchPage> {
                 onSubmitted: _submit,
               ),
             ),
-            SizedBox(
-              height: 52,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                children: SearchMode.values
-                    .map(
-                      (item) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(item.title),
-                          selected: mode == item,
-                          onSelected: (_) => setState(() => mode = item),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: MenuAnchor(
+                  controller: modeMenu,
+                  menuChildren: [
+                    for (final option in SearchMode.values)
+                      MenuItemButton(
+                        closeOnActivate: false,
+                        leadingIcon: Icon(
+                          mode == option
+                              ? Icons.check_rounded
+                              : Icons.search_rounded,
                         ),
+                        onPressed: () => setState(() => mode = option),
+                        child: Text(option.title),
                       ),
-                    )
-                    .toList(),
+                  ],
+                  builder: (context, menu, _) => TextButton.icon(
+                    key: const ValueKey('search-mode-menu'),
+                    onPressed: () {
+                      if (menu.isOpen) {
+                        menu.close();
+                      } else {
+                        FocusScope.of(context).unfocus();
+                        menu.open();
+                      }
+                    },
+                    icon: const Icon(Icons.tune_rounded),
+                    label: Text('搜索范围：${mode.title}'),
+                  ),
+                ),
               ),
             ),
             Expanded(
@@ -149,14 +174,17 @@ class _SearchPageState extends State<SearchPage> {
                               subtitle: Text(hit.subtitle),
                               trailing: const Icon(Icons.chevron_right_rounded),
                               onTap: () {
-                                _submit(query);
-                                _openHit(hit);
+                                if (submitted) {
+                                  _openHit(hit);
+                                } else {
+                                  _submit(hit.title);
+                                }
                               },
                             ),
                           ),
                         const SizedBox(height: 14),
                         Text(
-                          '本地演示搜索 · 接入登录后使用 Server/search.php',
+                          '本地演示搜索',
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.labelSmall,
                         ),
@@ -195,6 +223,15 @@ class _SearchPageState extends State<SearchPage> {
             leading: const Icon(Icons.history_rounded),
             title: Text(item),
             onTap: () => _submit(item),
+            trailing: IconButton(
+              tooltip: '删除搜索记录',
+              icon: const Icon(Icons.close_rounded, size: 18),
+              onPressed: () async {
+                setState(() => history.remove(item));
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString(_historyKey, jsonEncode(history));
+              },
+            ),
           ),
       ],
     );

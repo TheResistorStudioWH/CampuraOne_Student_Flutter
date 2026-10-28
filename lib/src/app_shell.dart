@@ -16,6 +16,8 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int selected = 0;
+  bool mapVisited = false;
+  final homeScroll = ScrollController();
   AnnouncementFeed? _announcementFeed;
 
   @override
@@ -28,6 +30,7 @@ class _AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
+    homeScroll.dispose();
     _announcementFeed?.dispose();
     super.dispose();
   }
@@ -102,10 +105,14 @@ class _AppShellState extends State<AppShell> {
         children: [
           HomePage(
             onOpenProfile: _openProfile,
+            scrollController: homeScroll,
             announcementFeed: _announcementFeed,
             studentToken: widget.studentToken,
           ),
-          MapPage(onOpenProfile: _openProfile),
+          if (mapVisited)
+            MapPage(onOpenProfile: _openProfile, active: selected == 1)
+          else
+            const SizedBox.shrink(),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -125,7 +132,17 @@ class _AppShellState extends State<AppShell> {
             selectedIndex: selected,
             labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
             onDestinationSelected: (value) {
-              if (value != selected) setState(() => selected = value);
+              if (value == selected && value == 0 && homeScroll.hasClients) {
+                homeScroll.animateTo(
+                  0,
+                  duration: const Duration(milliseconds: 350),
+                  curve: Curves.easeOutCubic,
+                );
+              }
+              setState(() {
+                selected = value;
+                if (value == 1) mapVisited = true;
+              });
             },
             destinations: const [
               NavigationDestination(

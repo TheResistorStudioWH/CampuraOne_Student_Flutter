@@ -35,10 +35,11 @@ void main() {
       ),
     );
     expect(find.text('Today和精选'), findsOneWidget);
-    await tester.tap(find.text('课程表').first);
+    await tester.tap(find.text('日程表').first);
     await tester.pumpAndSettle();
     expect(find.text('当天共'), findsNothing);
     expect(find.textContaining('演示课表'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets('search history is shown after a submitted query', (
@@ -75,10 +76,13 @@ void main() {
 
     await tester.pageBack();
     await tester.pumpAndSettle();
-    await tester.tap(find.text('摘要不可用 · 演示通知'));
+    await tester.tap(find.byKey(const ValueKey('short-notice-entry')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('打开短通知列表'));
     await tester.pumpAndSettle();
     expect(find.text('短通知'), findsOneWidget);
     expect(find.text('重要通知'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets('floating tab bar keeps dashboard left and map right', (
@@ -103,5 +107,6 @@ void main() {
     await tester.tap(find.text('地图'));
     await tester.pumpAndSettle();
     expect(find.text('搜索促销、商品和商户'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 }
